@@ -1,0 +1,28 @@
+baseURL = "https://0x-rust.github.io/"
+languageCode = "en-us"
+title = "small bytes of Rust"
+theme = "cactus"
+[params]
+  colortheme = "dark" # dark, light, white, or classic
+
+# Main menu which appears below site header.
+[[menu.main]]
+name = "Home"
+url = "/"
+weight = 1
+
+[[menu.main]]
+name = "All posts"
+url = "/posts"
+weight = 2
+
+[[menu.main]]
+name = "Tags"
+url = "/tags"
+weight = 3
+
+
+
+[[params.social]]
+  name = "github"
+  link = "https://github.com/0x-rust"

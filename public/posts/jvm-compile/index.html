@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title> Dynamic Compilation of JVM  </title>
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="all,follow">
+  <meta name="googlebot" content="index,follow,snippet,archive">
+  <meta property="og:title" content="Dynamic Compilation of JVM " />
+<meta property="og:description" content="One of the most crucial parts of the JVM is the Just-In-Time (JIT) compiler; understanding how JVM dynamic compilation and optimization work is key to getting a sense of how to measure and improve performace of JVM applications by writing JIT friendly applications. Having a mental model of how code execution can help us make informed decision. The other key point Micro benchmarking is hard to get right in general, but it is even harder to get right on JVM due the adpative nature of the compiler." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://isaiahp.xyz/posts/jvm-compile/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2019-02-14T15:16:03+01:00" />
+<meta property="article:modified_time" content="2019-02-14T15:16:03+01:00" />
+
+
+  <meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Dynamic Compilation of JVM "/>
+<meta name="twitter:description" content="One of the most crucial parts of the JVM is the Just-In-Time (JIT) compiler; understanding how JVM dynamic compilation and optimization work is key to getting a sense of how to measure and improve performace of JVM applications by writing JIT friendly applications. Having a mental model of how code execution can help us make informed decision. The other key point Micro benchmarking is hard to get right in general, but it is even harder to get right on JVM due the adpative nature of the compiler."/>
+
+  
+  
+    
+  
+  
+  <link rel="stylesheet" href="https://isaiahp.xyz/css/style-classic.css">
+  
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+      <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+    <![endif]-->
+  
+
+  
+<link rel="icon" type="image/png" href="https://isaiahp.xyz/images/favicon.ico" />
+
+  
+</head>
+<body class="max-width mx-auto px3 ltr">
+  <div class="content index py4">
+
+  <div id="header-post">
+  <a id="menu-icon" href="#"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="menu-icon-tablet" href="#"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="top-icon-tablet" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');" style="display:none;"><i class="fas fa-chevron-up fa-lg"></i></a>
+  <span id="menu">
+    <span id="nav">
+      <ul>
+         
+        <li><a href="/">Home</a></li>
+         
+        <li><a href="/posts">All posts</a></li>
+         
+        <li><a href="/tags">Tags</a></li>
+         
+        <li><a href="/about">About</a></li>
+        
+      </ul>
+    </span>
+    <br/>
+    <span id="actions">
+      <ul>
+        
+        <li>
+          <a class="icon" href=" https://isaiahp.xyz/posts/rethink-logging/">
+            <i class="fas fa-chevron-left" aria-hidden="true" onmouseover="$('#i-prev').toggle();" onmouseout="$('#i-prev').toggle();"></i>
+          </a>
+        </li>
+        
+        
+        <li>
+          <a class="icon" href="https://isaiahp.xyz/posts/bitcoin/">
+            <i class="fas fa-chevron-right" aria-hidden="true" onmouseover="$('#i-next').toggle();" onmouseout="$('#i-next').toggle();"></i>
+          </a>
+        </li>
+        
+        <li>
+          <a class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');">
+            <i class="fas fa-chevron-up" aria-hidden="true" onmouseover="$('#i-top').toggle();" onmouseout="$('#i-top').toggle();"></i>
+          </a>
+        </li>
+        <li>
+          <a class="icon" href="#">
+            <i class="fas fa-share-alt" aria-hidden="true" onmouseover="$('#i-share').toggle();" onmouseout="$('#i-share').toggle();" onclick="$('#share').toggle();return false;"></i>
+          </a>
+        </li>
+      </ul>
+      <span id="i-prev" class="info" style="display:none;">Previous post</span>
+      <span id="i-next" class="info" style="display:none;">Next post</span>
+      <span id="i-top" class="info" style="display:none;">Back to top</span>
+      <span id="i-share" class="info" style="display:none;">Share post</span>
+    </span>
+    <br/>
+    <div id="share" style="display: none">
+      
+      <ul>
+  
+  
+    
+  
+  
+  <li>
+    <a class="icon" href="http://www.facebook.com/sharer.php?u=https%3a%2f%2fisaiahp.xyz%2fposts%2fjvm-compile%2f">
+      <i class="fab fa-facebook " aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="https://twitter.com/share?url=https%3a%2f%2fisaiahp.xyz%2fposts%2fjvm-compile%2f&text=Dynamic%20Compilation%20of%20JVM%20">
+      <i class="fab fa-twitter " aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="http://www.linkedin.com/shareArticle?url=https%3a%2f%2fisaiahp.xyz%2fposts%2fjvm-compile%2f&title=Dynamic%20Compilation%20of%20JVM%20">
+      <i class="fab fa-linkedin " aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="https://pinterest.com/pin/create/bookmarklet/?url=https%3a%2f%2fisaiahp.xyz%2fposts%2fjvm-compile%2f&is_video=false&description=Dynamic%20Compilation%20of%20JVM%20">
+      <i class="fab fa-pinterest " aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="mailto:?subject=Dynamic%20Compilation%20of%20JVM%20&body=Check out this article: https%3a%2f%2fisaiahp.xyz%2fposts%2fjvm-compile%2f">
+      <i class="fas fa-envelope " aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="https://getpocket.com/save?url=https%3a%2f%2fisaiahp.xyz%2fposts%2fjvm-compile%2f&title=Dynamic%20Compilation%20of%20JVM%20">
+      <i class="fab fa-get-pocket " aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="http://reddit.com/submit?url=https%3a%2f%2fisaiahp.xyz%2fposts%2fjvm-compile%2f&title=Dynamic%20Compilation%20of%20JVM%20">
+      <i class="fab fa-reddit " aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="http://www.stumbleupon.com/submit?url=https%3a%2f%2fisaiahp.xyz%2fposts%2fjvm-compile%2f&title=Dynamic%20Compilation%20of%20JVM%20">
+      <i class="fab fa-stumbleupon " aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="http://digg.com/submit?url=https%3a%2f%2fisaiahp.xyz%2fposts%2fjvm-compile%2f&title=Dynamic%20Compilation%20of%20JVM%20">
+      <i class="fab fa-digg " aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="http://www.tumblr.com/share/link?url=https%3a%2f%2fisaiahp.xyz%2fposts%2fjvm-compile%2f&name=Dynamic%20Compilation%20of%20JVM%20&description=One%20of%20the%20most%20crucial%20parts%20of%20the%20JVM%20is%20the%20Just-In-Time%20%28JIT%29%20compiler%3b%20understanding%20how%20JVM%20dynamic%20compilation%20and%20optimization%20work%20is%20key%20to%20getting%20a%20sense%20of%20how%20to%20measure%20and%20improve%20performace%20of%20JVM%20applications%20by%20writing%20JIT%20friendly%20applications.%20Having%20a%20mental%20model%20of%20how%20code%20execution%20can%20help%20us%20make%20informed%20decision.%20The%20other%20key%20point%20Micro%20benchmarking%20is%20hard%20to%20get%20right%20in%20general%2c%20but%20it%20is%20even%20harder%20to%20get%20right%20on%20JVM%20due%20the%20adpative%20nature%20of%20the%20compiler.">
+      <i class="fab fa-tumblr " aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="https://news.ycombinator.com/submitlink?u=https%3a%2f%2fisaiahp.xyz%2fposts%2fjvm-compile%2f&t=Dynamic%20Compilation%20of%20JVM%20">
+      <i class="fab fa-hacker-news " aria-hidden="true"></i>
+    </a>
+  </li>
+</ul>
+
+    </div>
+    <div id="toc">
+      <nav id="TableOfContents">
+  <ul>
+    <li><a href="#a-namejvm-exe-jvm-code-execution-in-a-nutshell-a"><!-- raw HTML omitted --> JVM code execution in a nutshell <!-- raw HTML omitted --></a>
+      <ul>
+        <li></li>
+        <li><a href="#jit-compilers-in-action">JIT Compiler(s) in Action</a></li>
+      </ul>
+    </li>
+    <li><a href="#a-namemeasure-dont-guess-measure-dont-guess-a"><!-- raw HTML omitted --> Measure dont guess <!-- raw HTML omitted --></a></li>
+  </ul>
+</nav>
+    </div>
+  </span>
+</div>
+
+
+  <article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+    <header>
+      <h1 class="posttitle" itemprop="name headline">
+        Dynamic Compilation of JVM 
+      </h1>
+      <div class="meta">
+        
+        <div class="postdate">
+          
+          <time datetime="2019-02-14 15:16:03 &#43;0100 &#43;0100" itemprop="datePublished">2019-02-14</time>
+          
+        </div>
+        
+        
+      </div>
+    </header>
+
+  
+    <div class="content" itemprop="articleBody">
+      <p>One of the most crucial parts of the JVM is the Just-In-Time (JIT) compiler; understanding how JVM dynamic compilation and optimization work is key to getting a sense of how to measure and improve performace of JVM applications by writing <em>JIT friendly</em> applications. Having a mental model of how code execution can help us make informed decision.
+The other key point Micro benchmarking is hard to get right in general, but it is even harder to get right on JVM due the adpative nature of the compiler.</p>
+<ol>
+<li><a href="#jvm-exe">JVM code execution in a nutshell</a></li>
+<li><a href="">Perils of microbenchmarking</a></li>
+<li><a href="#measure-dont-guess">case for measuring JVM applications</a></li>
+</ol>
+<h2 id="a-namejvm-exe-jvm-code-execution-in-a-nutshell-a"><!-- raw HTML omitted --> JVM code execution in a nutshell <!-- raw HTML omitted --></h2>
+<p>This should provide motivation for why it is even more important to measure and identify hotspots in your application code .
+The runtime execution of Java code is far more complex than native C/C++ applications, for example gcc comipler compiles and optimizes C code Ahead of time (AOT), which means we can use a disassemble on binaries to see exactly the machine code which will run on the hardware.
+JVM on the other hand does not do this as it several key reasons</p>
+<ul>
+<li>One the main selling point of Java is platform independence, this allivates the need for programmers to recompile application for different CPU architecutres (x86, ARM, Sparc) or Operating systems (Linux/Windows), instead moves the portability problem to JVM). JVM application are compiled into platform independent byte-code (store in <em>.class files</em>)</li>
+<li>JVM allows runtime modifications to code, which mean it cannot rely just on static compilation</li>
+</ul>
+<p>Given the contraints above JVM makes a completely different set of tradeoffs, to enable a very <em>adaptive system</em>. Code compilation and optimization are performed at runtime, <em>continously</em> and highly dependend on work-load of the applicaion.
+So Unlike a statically compiled language like C/C++, We <em>dont know</em> the exact code executed on the cpu until runtime. A high level overview of how JVM executes code is  as outlined below</p>
+<p>Compiler <em>javac</em>  simply transform Java source code into <em>Java Bytecode</em>, but this isn&rsquo;t machine code which a cpu can execute, it is simply a machine independent intermediate representation.
+In this process it performs some minimal and elementry optimization (<em>this is by design</em> as we shall see most powerful optimization are done by the <em>JIT</em>)</p>
+<pre tabindex="0"><code>public class StringConcat {
+    
+    public static void main(String[] args) {
+        String str = &#34;is this&#34;;
+        str += &#34;inefficient ?&#34;;
+
+        System.out.print(str);
+
+    }
+
+}
+</code></pre><p>Using the hotspot java-8 <em>javac</em> compiler, the code above is transformed the following byte-code
+<code>javap -c StringConcat.class </code></p>
+<pre tabindex="0"><code>public class net.isaiahp.StringConcat {
+  public net.isaiahp.StringConcat();
+    Code:
+       0: aload_0
+       1: invokespecial #1                  // Method java/lang/Object.&#34;&lt;init&gt;&#34;:()V
+       4: return
+
+  public static void main(java.lang.String[]);
+    Code:
+       0: ldc           #2                  // String is this
+       2: astore_1
+       3: new           #3                  // class java/lang/StringBuilder
+       6: dup
+       7: invokespecial #4                  // Method java/lang/StringBuilder.&#34;&lt;init&gt;&#34;:()V
+      10: aload_1
+      11: invokevirtual #5                  // Method java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+      14: ldc           #6                  // String inefficient ?
+      16: invokevirtual #5                  // Method java/lang/StringBuilder.append:(Ljava/lang/String;)Ljava/lang/StringBuilder;
+      19: invokevirtual #7                  // Method java/lang/StringBuilder.toString:()Ljava/lang/String;
+      22: astore_1
+      23: getstatic     #8                  // Field java/lang/System.out:Ljava/io/PrintStream;
+      26: aload_1
+      27: invokevirtual #9                  // Method java/io/PrintStream.print:(Ljava/lang/String;)V
+      30: return
+}
+</code></pre><p>Notice @ 7: of generated byte-code a <em>StringBuilder</em> is initialized</p>
+<p>However the byte-code produce  by javac cannot be executed on a real cpu, Its the JVM responsibilty to turn byte code into native code for the cpu to execute. This is can be done in two ways
+- JVM can interpret and emulate each byte code instruction, this approach is simple to implement but suffer from slower execution as native code can be orders of magnitude faster
+- The other option is JVM can compile each method to native code for the particulat platform and then run the machine code directly on the cpu, the trade off here is code generation at rutime is can be expensive and can add too much overhead especially for cold method. (ie if a method is only executed once, then any benefits in execution speed is outweighed by time to compile)</p>
+<blockquote>
+<p>Byte-Code cannot be run on a physical CPU so how does the <em>HotSpot JVM</em> actually executes code ?</p>
+</blockquote>
+<p>As we shall see <em>most</em> JVMs use a combination of the of both the above approaches.</p>
+<p>The diagram below illustrates the code-execution lifecycle on modern JVMs.
+<img src="/imgs/jvm-life-cycle.svg" alt="jvm-execution-life-cycle"></p>
+<ol>
+<li><strong>Byte Code Interpreter</strong>- All code execution is first done through the byte code interpreter, once the .class files are loaded by class loader the method that is executed is stored in a reserved area of memory called the <em>Method Cache</em>, this contains verified byte code for each method. Only <em>hot methods</em> deemed worthy of compilation to navtive code are actually compiled.</li>
+</ol>
+<blockquote>
+<p>Early version of JVM execute code only in interpreted mode, you can still run an application in interpreted mode only by <code>-XX:+Int</code> jvm arg</p>
+</blockquote>
+<ol start="2">
+<li>
+<p><strong>Profiling</strong>: One of the main function of JVM is to determine which methods to compile at runtime. To determine the <em>hotness</em> of a method, an invocation counter is associated with each method and each time the interpreter executes a method counter is increment. Background threads in JVM observe and gather statistics on which methods and what parts of the method bytecode from the <em>Method Cache</em> are most commonly run. The information that has been collected about the execution of the app is called a <em>profile</em>. The compiler can then use this <em>profile</em> to make some of its optimizations more effective, which can result in signigicant performace benefits, this technique is often reffered to as profile-guided optimization.</p>
+</li>
+<li>
+<p>**JIT compilation (native code generation)*: Once a <em>hot method</em> has been indetified by the optimizer, the method is compiled to highly optimized machine code. This machine code, is stored in a region of memory called <em>Code Cache</em>. Once machine code for the method is in the code-cache the JVM patches the method dispatch table to point to the machine-code, so subsequent calls to the method will execute the machine code directly on the CPU.</p>
+</li>
+</ol>
+<blockquote>
+<p>The current openJDK implementations have <em>two JIT compilers</em></p>
+</blockquote>
+<pre><code>*Client compiler (C1)* which can produce machine code quickly however not with aggresive optimization. 
+
+*Server compiler C2* take a bit longer to produce machine code but can generate highgly optimized machine code. 
+
+Previously C1 compiler was used for desktop applications and C2 for server applications, from JDK 8 onwards the default behaviour is to combine both the C1 and C2 compilers. Initially bytecode for a method is compiled with C1 and if the method is still identified as a hotspot and there is enough data collected by JVM to indicate a C2 compilation is worth while, the method is compiled a second time with further optimisations.
+This is usually reffered to at **Tiered Compilation** and is turn on by default of all JVM version 8 onwards. 
+
+
+-XX:+/-TieredCompilation
+ 
+
+can be used to enbable disable this feature. 
+</code></pre>
+<ol start="4">
+<li><strong>Deoptimization</strong>: It turns out the JVM <strong>must</strong> be able to deoptimze code (i.e discard native code for a method and run the method in the interpreter).</li>
+</ol>
+<h4 id="why-the-need-to-deoptimize-code">Why the need to deoptimize code</h4>
+<pre><code>One of the main advantages of a *Managed* profile guided optimizer is the ability to make *speculative optimzations*, this where the VM can make *educated guesses* and perform aggressive optimizations, however for this to work there is needs to be a way for the JVM to *correct its assumptions* just in-case the assumptions are no longer true, deoptimzation is fall back strategy where JIT compiled code is invalidated and execution falls back to interpreter, until further data is collected before another compilation is done. 
+</code></pre>
+<h4 id="inlining-virtual-method-dispatches-is-not-generally-possible-in-static-aot-compilers">Inlining virtual method dispatches is not generally possible in static AOT compilers</h4>
+<pre><code>All methods are virtual by default in Java, but JIT compiler can remove the overhead of virtual method dispatches and turned it into static method call (fixed address call, indirection of vtable lookup can be eliminated) or even inlined at the call site *if* the at runtime there there is enough data to show that at the call site it mosly likely only a single type in a heirachy is executed.
+
+However if at a later point a new type from the class heirachy is loaded or present at the call site, the JIT will have to deoptimize, that is it will back out the optimization by invalidating the machine code from *Code Cache* and execution reverts back to running bytecode through the interpreter which will execute full virtual dispatch until next JIT compilation, this means generated machine code for a particular method can be invalidated by changes to the running program must be thrown away and potentially regenerated.
+</code></pre>
+<h3 id="jit-compilers-in-action">JIT Compiler(s) in Action</h3>
+<p>To demonstrate the fact that java does not just run is one way and see the JIT compiler in action. We execute a simple program shown below; in this program we initialise an int array of ten thousand random integers, we provide <em>two</em> implemenations of <code>java.util.function.IntPredicate</code> <code>class IsEven</code> and <code>class IsOdd</code> as the name suggest one implemention tests to see if an int is odd and other other tests to see if the int is even.
+We iterate through the array and execute the predicate and measure the execution time to test all items of the array, we repeate this a 100 times observe how the execution times vary and how the perfomance changes as the application continues to run. We do this process once using the <code>IsOdd</code> predicate and then using <code>IsEven</code> predicate.</p>
+<pre tabindex="0"><code>package net.isaiahp;
+
+import java.util.Random;
+import java.util.function.IntPredicate;
+
+public class Main {
+
+    private static final int[] randomValues;
+
+    public static final int MAX_SIZE = 10_000;
+
+    static {
+
+        Random random = new Random();
+        randomValues = new int[MAX_SIZE];
+        for (int i = 0; i &lt; randomValues.length; i++) {
+            randomValues[i] = random.nextInt();
+        }
+
+    }
+
+    private static class IsEven implements IntPredicate {
+        @Override
+        public boolean test(int value) {
+            return (value &amp; 0x1) == 0;
+        }
+    }
+
+    private static class IsOdd implements IntPredicate  {
+        @Override
+        public boolean test(int value) {
+            return (value &amp; 0x1) == 1;
+        }
+    }
+
+    public static void main(String[] args) {
+
+        final int ITERATIONS = 100;
+        runIterations(ITERATIONS, new IsOdd(), 0);
+
+        runIterations(ITERATIONS, new IsEven(), 100);
+
+    }
+
+    private static void runIterations(int count, IntPredicate predicate, int start) {
+        for (int i = start; i &lt; (start + count); i++) {
+            long time = testValues(randomValues, predicate);
+            System.out.println(&#34;#&#34; + i + &#34;, &#34; + time);
+        }
+    }
+
+    private static long testValues(int[] values, IntPredicate predicate) {
+
+        long start = System.nanoTime();
+        for (int i = 0; i &lt; values.length; i++) {
+            boolean unused = predicate.test(values[i]);
+        }
+        long end = System.nanoTime();
+        return (end - start);
+    }
+}
+</code></pre><p>To run the above program above we use openjdk 11</p>
+<pre tabindex="0"><code>java -version
+openjdk version &#34;11.0.2&#34; 2019-01-15
+OpenJDK Runtime Environment 18.9 (build 11.0.2+9)
+OpenJDK 64-Bit Server VM 18.9 (build 11.0.2+9, mixed mode)
+</code></pre><pre tabindex="0"><code>#0, 769734
+#1, 330086
+#2, 326234
+#3, 327919
+#4, 324036
+#5, 328149
+#6, 343698
+#7, 339803
+#8, 227353
+#9, 122103
+#10, 80405
+#11, 88627
+#12, 110416
+#13, 117678
+#14, 127212
+#15, 136834
+#16, 132387
+#17, 131895
+#18, 130024
+</code></pre><blockquote>
+<p>Generally the server compiler makes aggressive inlining decisions of non-final methods. As long as the inlined method is never overridden the code is correct. When a subclass is loaded and the method overridden, the compiled code is broken for all future calls to it. The code gets declared &ldquo;not entrant&rdquo; (no future callers to the broken code), but sometimes existing callers can keep using the code. In the case of inlining, that&rsquo;s not good enough; existing callers&rsquo; stack frames are &ldquo;deoptimized&rdquo; when they return to the code from nested calls (or just if they are running in the code). When no more stack frames hold PC&rsquo;s into the broken code it&rsquo;s declared a &ldquo;zombie&rdquo; - ready for removal once the GC gets around to it</p>
+</blockquote>
+<p>we execute the program and plot the execution times to help us visualize the performance.</p>
+<p><img src="/imgs/time.svg" alt="run-time-plot"></p>
+<p>The graph shows the different stages of code execution.</p>
+<ul>
+<li>we see the run times for drop significantly once the code is compiled to native code by <em>C2 compiler</em>.</li>
+<li>we can also see a spike in runtime as code is deoptimized once a different implementation of a class is loaded and run</li>
+</ul>
+<h4 id="pratical-guidelines">Pratical guidelines</h4>
+<ul>
+<li>once a hot method has been identified use <code>-XX:+PrintCompilation</code> jvm flag to verify the method was JIT compiled</li>
+<li>Refactor code have smaller methods (large methods wont be JIT compiled), use JarScan to identify large method in third party jars</li>
+<li>write clean idiomatic java code</li>
+<li>Avoid exceptions for control flow, use only in exceptional circumstances</li>
+<li>Allow JVM to warm up after restarts.</li>
+</ul>
+<h2 id="a-namemeasure-dont-guess-measure-dont-guess-a"><!-- raw HTML omitted --> Measure dont guess <!-- raw HTML omitted --></h2>
+<p>As we can see the number of transformations our code goes through during runtime, it does really obsure the code that is written and the actual code that is executed on the machine.
+No what it does .
+JVM is does a good job detecting patterns in a very large software at runtime and applies optimization dynamically, this means the code that will write <strong>will</strong> very different to the <strong>machine code</strong> that is run on the cpu, meaning any <em>micro</em> optimizations we perform as a developer may have no affect or even a negative effect at all on the runtime performance. For example optimizing a method which is never going to be JIT compiled is wasted effort, identifying <strong>hot code</strong> should always be the first step.</p>
+<blockquote>
+<p>**Does that mean we should never care about performance ? **</p>
+</blockquote>
+<p>No not at all but what it means is we should foucs on our efforts on doing <strong>micro optimization</strong> we should focus writing <strong>JIT friendly</strong> code so the JVM can do it optimization better.
+The other area to focus on is areas where an JVM can&rsquo;t help, these are optimization at the domain level for example</p>
+<ul>
+<li>replace a linear search with an efficient log n algorithm</li>
+<li>how our application make use of OS resources such as threads</li>
+<li>implement caching if needed</li>
+</ul>
+<p>To identify areas of bottlenecks it is important to collect data and measure the performance of a running application. Profilers are one tool every developer should use before attempting to make any performance improvements.
+Following quote from Knuth sums it up nicely</p>
+<blockquote>
+<p><strong>&ldquo;Programmers waste enormous amounts of time thinking about, or worrying about, the speed of noncritical parts of
+their programs, and these attempts at efficiency actually have a strong negative impact when debugging and maintenance
+are considered. We should forget about small efficiencies, say about 97% of the time: premature optimization is the
+root of all evil.Yet we should not pass up our opportunities in that critical 3%. A good programmer will not be lulled
+into complacency by such reasoning, he will be wise to look carefully at the critical code; but only after that code
+has been identified. It is often a mistake to make a priori judgments about what parts of a program are really
+critical, since the universal experience of programmers who have been using measurement tools has been that their
+intuitive guesses fail.&rdquo;</strong>
+<!-- raw HTML omitted --> — Donald Knuth<!-- raw HTML omitted --></p>
+</blockquote>
+
+    </div>
+  </article>
+
+  
+  
+
+
+
+
+
+  <div id="footer-post-container">
+  <div id="footer-post">
+
+    <div id="nav-footer" style="display: none">
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/posts">All posts</a></li>
+         
+          <li><a href="/tags">Tags</a></li>
+         
+          <li><a href="/about">About</a></li>
+        
+      </ul>
+    </div>
+
+    <div id="toc-footer" style="display: none">
+      <nav id="TableOfContents">
+  <ul>
+    <li><a href="#a-namejvm-exe-jvm-code-execution-in-a-nutshell-a"><!-- raw HTML omitted --> JVM code execution in a nutshell <!-- raw HTML omitted --></a>
+      <ul>
+        <li></li>
+        <li><a href="#jit-compilers-in-action">JIT Compiler(s) in Action</a></li>
+      </ul>
+    </li>
+    <li><a href="#a-namemeasure-dont-guess-measure-dont-guess-a"><!-- raw HTML omitted --> Measure dont guess <!-- raw HTML omitted --></a></li>
+  </ul>
+</nav>
+    </div>
+
+    <div id="share-footer" style="display: none">
+      
+      <ul>
+  
+  
+    
+  
+  
+  <li>
+    <a class="icon" href="http://www.facebook.com/sharer.php?u=https%3a%2f%2fisaiahp.xyz%2fposts%2fjvm-compile%2f">
+      <i class="fab fa-facebook fa-lg" aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="https://twitter.com/share?url=https%3a%2f%2fisaiahp.xyz%2fposts%2fjvm-compile%2f&text=Dynamic%20Compilation%20of%20JVM%20">
+      <i class="fab fa-twitter fa-lg" aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="http://www.linkedin.com/shareArticle?url=https%3a%2f%2fisaiahp.xyz%2fposts%2fjvm-compile%2f&title=Dynamic%20Compilation%20of%20JVM%20">
+      <i class="fab fa-linkedin fa-lg" aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="https://pinterest.com/pin/create/bookmarklet/?url=https%3a%2f%2fisaiahp.xyz%2fposts%2fjvm-compile%2f&is_video=false&description=Dynamic%20Compilation%20of%20JVM%20">
+      <i class="fab fa-pinterest fa-lg" aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="mailto:?subject=Dynamic%20Compilation%20of%20JVM%20&body=Check out this article: https%3a%2f%2fisaiahp.xyz%2fposts%2fjvm-compile%2f">
+      <i class="fas fa-envelope fa-lg" aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="https://getpocket.com/save?url=https%3a%2f%2fisaiahp.xyz%2fposts%2fjvm-compile%2f&title=Dynamic%20Compilation%20of%20JVM%20">
+      <i class="fab fa-get-pocket fa-lg" aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="http://reddit.com/submit?url=https%3a%2f%2fisaiahp.xyz%2fposts%2fjvm-compile%2f&title=Dynamic%20Compilation%20of%20JVM%20">
+      <i class="fab fa-reddit fa-lg" aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="http://www.stumbleupon.com/submit?url=https%3a%2f%2fisaiahp.xyz%2fposts%2fjvm-compile%2f&title=Dynamic%20Compilation%20of%20JVM%20">
+      <i class="fab fa-stumbleupon fa-lg" aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="http://digg.com/submit?url=https%3a%2f%2fisaiahp.xyz%2fposts%2fjvm-compile%2f&title=Dynamic%20Compilation%20of%20JVM%20">
+      <i class="fab fa-digg fa-lg" aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="http://www.tumblr.com/share/link?url=https%3a%2f%2fisaiahp.xyz%2fposts%2fjvm-compile%2f&name=Dynamic%20Compilation%20of%20JVM%20&description=One%20of%20the%20most%20crucial%20parts%20of%20the%20JVM%20is%20the%20Just-In-Time%20%28JIT%29%20compiler%3b%20understanding%20how%20JVM%20dynamic%20compilation%20and%20optimization%20work%20is%20key%20to%20getting%20a%20sense%20of%20how%20to%20measure%20and%20improve%20performace%20of%20JVM%20applications%20by%20writing%20JIT%20friendly%20applications.%20Having%20a%20mental%20model%20of%20how%20code%20execution%20can%20help%20us%20make%20informed%20decision.%20The%20other%20key%20point%20Micro%20benchmarking%20is%20hard%20to%20get%20right%20in%20general%2c%20but%20it%20is%20even%20harder%20to%20get%20right%20on%20JVM%20due%20the%20adpative%20nature%20of%20the%20compiler.">
+      <i class="fab fa-tumblr fa-lg" aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="https://news.ycombinator.com/submitlink?u=https%3a%2f%2fisaiahp.xyz%2fposts%2fjvm-compile%2f&t=Dynamic%20Compilation%20of%20JVM%20">
+      <i class="fab fa-hacker-news fa-lg" aria-hidden="true"></i>
+    </a>
+  </li>
+</ul>
+
+    </div>
+
+    <div id="actions-footer">
+      
+        <a id="menu" class="icon" href="#" onclick="$('#nav-footer').toggle();return false;">
+          <i class="fas fa-bars fa-lg" aria-hidden="true"></i> Menu</a>
+        <a id="toc" class="icon" href="#" onclick="$('#toc-footer').toggle();return false;">
+          <i class="fas fa-list fa-lg" aria-hidden="true"></i> TOC</a>
+        <a id="share" class="icon" href="#" onclick="$('#share-footer').toggle();return false;">
+          <i class="fas fa-share-alt fa-lg" aria-hidden="true"></i> share</a>
+        <a id="top" style="display:none" class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');">
+          <i class="fas fa-chevron-up fa-lg" aria-hidden="true"></i> Top</a>
+    </div>
+
+  </div>
+</div>
+
+
+  <footer id="footer">
+  <div class="footer-left">
+    Copyright  &copy; 2022  Quick Byte 
+  </div>
+  <div class="footer-right">
+    <nav>
+      <ul>
+         
+        <li><a href="/">Home</a></li>
+         
+        <li><a href="/posts">All posts</a></li>
+         
+        <li><a href="/tags">Tags</a></li>
+         
+        <li><a href="/about">About</a></li>
+        
+      </ul>
+    </nav>
+  </div>
+</footer>
+
+
+  </div>
+</body>
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+<script src="/lib/jquery/jquery.min.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+</html>
