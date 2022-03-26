@@ -158,7 +158,7 @@ Nearly all computer systems now a days have hardware which have multi core chips
   <ul>
     <li><a href="#why-memory-model">why memory model</a></li>
     <li><a href="#dont-forget-the-store-buffer-">Dont forget the Store buffer !</a></li>
-    <li><a href="#what-can-programmers-do--">What can programmers do  ?</a></li>
+    <li><a href="#draining-the-store-buffer">Draining the store buffer</a></li>
   </ul>
 </nav>
     </div>
@@ -442,7 +442,7 @@ as we demonstrated in the example the write to memory by each core are queued it
 <li>Loads can be reordered with earlier stores to different memory location. Load and stores to same memory location will not be reordered</li>
 <li>Memory ordering obeys causality (ie stores are seen in consistent order by other processors)</li>
 </ul>
-<h2 id="what-can-programmers-do--">What can programmers do  ?</h2>
+<h2 id="draining-the-store-buffer">Draining the store buffer</h2>
 <p>Since a Store followed by a Load can appear out of order to other cores, however programmers may wish to ensure load and store instructions to be ordered across all cores , the x86 processor have a ‘mfence’ (memory fence) instruction. the mfence instruction will ensure a core will not only reorder the instructions, but also will ensure that any <em>buffered stores in the cores private store buffer are propagated to the memory subsystem</em> before executing instructions after mfence. with this instruction we can strengthen the memory consistency model when required by the software. By adding the mfence instruction to our previous example , it should never be possible to get a state where (r1,r2) = (0,0)</p>
 <div class="highlight"><div style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;display:grid;">
 <table style="border-spacing:0;padding:0;margin:0;border:0;"><tr><td style="vertical-align:top;padding:0;margin:0;border:0;">
@@ -573,7 +573,7 @@ as we demonstrated in the example the write to memory by each core are queued it
   <ul>
     <li><a href="#why-memory-model">why memory model</a></li>
     <li><a href="#dont-forget-the-store-buffer-">Dont forget the Store buffer !</a></li>
-    <li><a href="#what-can-programmers-do--">What can programmers do  ?</a></li>
+    <li><a href="#draining-the-store-buffer">Draining the store buffer</a></li>
   </ul>
 </nav>
     </div>
