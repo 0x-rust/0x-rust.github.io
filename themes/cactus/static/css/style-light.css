@@ -352,7 +352,7 @@ body h5,
 body h6 {
   display: inline;
   text-decoration: none;
-  color: #666;
+  color: #777;
   font-weight: bold;
   font-size: 0.9rem;
 }
@@ -419,7 +419,7 @@ body table {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
-  font-size: 12px;
+  font-size: 14px;
   overflow: auto;
   display: block;
 }
@@ -442,7 +442,7 @@ body td {
 @font-face {
   font-style: normal;
   font-family: "JetBrains Mono";
-  src: local("JetBrains Mono"), url("../lib/JetBrainsMono/ttf/JetBrainsMono-Regular.ttf") format("truetype");
+  src: local("JetBrains Mono"), url("../lib/JetBrainsMono/ttf/JetBrainsMono-Medium.ttf") format("truetype");
 }
 *,
 *:before,
@@ -461,10 +461,10 @@ body {
   margin: 0;
   height: 100%;
   background-color: #e2e0de;
-  color: #363533;
+  color: #030303;
   font-display: swap;
   font-weight: 400;
-  font-size: 14px;
+  font-size: 16px;
   font-family: "JetBrains Mono", monospace;
   line-height: 1.725;
   text-rendering: geometricPrecision;

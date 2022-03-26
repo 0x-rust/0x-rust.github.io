@@ -3,7 +3,7 @@ languageCode = "en-us"
 title = "small bytes of Rust"
 theme = "cactus"
 [params]
-  colortheme = "dark" # dark, light, white, or classic
+  colortheme = "light" # dark, light, white, or classic
 
 # Main menu which appears below site header.
 [[menu.main]]
