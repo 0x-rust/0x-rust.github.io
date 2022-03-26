@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title> hardware memory models for programmers </title>
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="all,follow">
+  <meta name="googlebot" content="index,follow,snippet,archive">
+  <meta property="og:title" content="hardware memory models for programmers" />
+<meta property="og:description" content="originally posted 2013
+Nearly all computer systems now a days have hardware which have multi core chips and shared memory. in this post I hope to summarize things i learnt from a x86-TSO paper, and hope to provide a high level overview of TSO (total store order) model which is most common on x86 processors. What i really like about this paper is it provices a simple abstract model software developers can use to reason about low-level concurrency code running on x86 modern multi-core shared memory systems." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://0x-rust.github.io/posts/memory-model/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2022-03-20T20:43:25+00:00" />
+<meta property="article:modified_time" content="2022-03-20T20:43:25+00:00" />
+
+
+  <meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="hardware memory models for programmers"/>
+<meta name="twitter:description" content="originally posted 2013
+Nearly all computer systems now a days have hardware which have multi core chips and shared memory. in this post I hope to summarize things i learnt from a x86-TSO paper, and hope to provide a high level overview of TSO (total store order) model which is most common on x86 processors. What i really like about this paper is it provices a simple abstract model software developers can use to reason about low-level concurrency code running on x86 modern multi-core shared memory systems."/>
+
+  
+  
+    
+  
+  
+  <link rel="stylesheet" href="https://0x-rust.github.io/css/style-light.css">
+  
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+      <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+    <![endif]-->
+  
+
+  
+<link rel="icon" type="image/png" href="https://0x-rust.github.io/images/favicon.ico" />
+
+  
+</head>
+<body class="max-width mx-auto px3 ltr">
+  <div class="content index py4">
+
+  <div id="header-post">
+  <a id="menu-icon" href="#"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="menu-icon-tablet" href="#"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="top-icon-tablet" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');" style="display:none;"><i class="fas fa-chevron-up fa-lg"></i></a>
+  <span id="menu">
+    <span id="nav">
+      <ul>
+         
+        <li><a href="/">Home</a></li>
+         
+        <li><a href="/posts">All posts</a></li>
+         
+        <li><a href="/tags">Tags</a></li>
+        
+      </ul>
+    </span>
+    <br/>
+    <span id="actions">
+      <ul>
+        
+        <li>
+          <a class="icon" href=" https://0x-rust.github.io/about/">
+            <i class="fas fa-chevron-left" aria-hidden="true" onmouseover="$('#i-prev').toggle();" onmouseout="$('#i-prev').toggle();"></i>
+          </a>
+        </li>
+        
+        
+        <li>
+          <a class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');">
+            <i class="fas fa-chevron-up" aria-hidden="true" onmouseover="$('#i-top').toggle();" onmouseout="$('#i-top').toggle();"></i>
+          </a>
+        </li>
+        <li>
+          <a class="icon" href="#">
+            <i class="fas fa-share-alt" aria-hidden="true" onmouseover="$('#i-share').toggle();" onmouseout="$('#i-share').toggle();" onclick="$('#share').toggle();return false;"></i>
+          </a>
+        </li>
+      </ul>
+      <span id="i-prev" class="info" style="display:none;">Previous post</span>
+      <span id="i-next" class="info" style="display:none;">Next post</span>
+      <span id="i-top" class="info" style="display:none;">Back to top</span>
+      <span id="i-share" class="info" style="display:none;">Share post</span>
+    </span>
+    <br/>
+    <div id="share" style="display: none">
+      
+      <ul>
+  
+  
+    
+  
+  
+  <li>
+    <a class="icon" href="http://www.facebook.com/sharer.php?u=https%3a%2f%2f0x-rust.github.io%2fposts%2fmemory-model%2f">
+      <i class="fab fa-facebook " aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="https://twitter.com/share?url=https%3a%2f%2f0x-rust.github.io%2fposts%2fmemory-model%2f&text=hardware%20memory%20models%20for%20programmers">
+      <i class="fab fa-twitter " aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="http://www.linkedin.com/shareArticle?url=https%3a%2f%2f0x-rust.github.io%2fposts%2fmemory-model%2f&title=hardware%20memory%20models%20for%20programmers">
+      <i class="fab fa-linkedin " aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="https://pinterest.com/pin/create/bookmarklet/?url=https%3a%2f%2f0x-rust.github.io%2fposts%2fmemory-model%2f&is_video=false&description=hardware%20memory%20models%20for%20programmers">
+      <i class="fab fa-pinterest " aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="mailto:?subject=hardware%20memory%20models%20for%20programmers&body=Check out this article: https%3a%2f%2f0x-rust.github.io%2fposts%2fmemory-model%2f">
+      <i class="fas fa-envelope " aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="https://getpocket.com/save?url=https%3a%2f%2f0x-rust.github.io%2fposts%2fmemory-model%2f&title=hardware%20memory%20models%20for%20programmers">
+      <i class="fab fa-get-pocket " aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="http://reddit.com/submit?url=https%3a%2f%2f0x-rust.github.io%2fposts%2fmemory-model%2f&title=hardware%20memory%20models%20for%20programmers">
+      <i class="fab fa-reddit " aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="http://www.stumbleupon.com/submit?url=https%3a%2f%2f0x-rust.github.io%2fposts%2fmemory-model%2f&title=hardware%20memory%20models%20for%20programmers">
+      <i class="fab fa-stumbleupon " aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="http://digg.com/submit?url=https%3a%2f%2f0x-rust.github.io%2fposts%2fmemory-model%2f&title=hardware%20memory%20models%20for%20programmers">
+      <i class="fab fa-digg " aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="http://www.tumblr.com/share/link?url=https%3a%2f%2f0x-rust.github.io%2fposts%2fmemory-model%2f&name=hardware%20memory%20models%20for%20programmers&description=originally%20posted%202013%0aNearly%20all%20computer%20systems%20now%20a%20days%20have%20hardware%20which%20have%20multi%20core%20chips%20and%20shared%20memory.%20in%20this%20post%20I%20hope%20to%20summarize%20things%20i%20learnt%20from%20a%20x86-TSO%20paper%2c%20and%20hope%20to%20provide%20a%20high%20level%20overview%20of%20TSO%20%28total%20store%20order%29%20model%20which%20is%20most%20common%20on%20x86%20processors.%20What%20i%20really%20like%20about%20this%20paper%20is%20it%20provices%20a%20simple%20abstract%20model%20software%20developers%20can%20use%20to%20reason%20about%20low-level%20concurrency%20code%20running%20on%20x86%20modern%20multi-core%20shared%20memory%20systems.">
+      <i class="fab fa-tumblr " aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="https://news.ycombinator.com/submitlink?u=https%3a%2f%2f0x-rust.github.io%2fposts%2fmemory-model%2f&t=hardware%20memory%20models%20for%20programmers">
+      <i class="fab fa-hacker-news " aria-hidden="true"></i>
+    </a>
+  </li>
+</ul>
+
+    </div>
+    <div id="toc">
+      <nav id="TableOfContents">
+  <ul>
+    <li><a href="#why-memory-model">why memory model</a></li>
+    <li><a href="#dont-forget-the-store-buffer-">Dont forget the Store buffer !</a></li>
+    <li><a href="#what-can-programmers-do--">What can programmers do  ?</a></li>
+  </ul>
+</nav>
+    </div>
+  </span>
+</div>
+
+
+  <article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+    <header>
+      <h1 class="posttitle" itemprop="name headline">
+        hardware memory models for programmers
+      </h1>
+      <div class="meta">
+        
+        <div class="postdate">
+          
+          <time datetime="2022-03-20 20:43:25 &#43;0000 UTC" itemprop="datePublished">2022-03-20</time>
+          
+        </div>
+        
+        
+      </div>
+    </header>
+
+  
+    <div class="content" itemprop="articleBody">
+      <p><a href="https://isaiahperumalla.wordpress.com/2013/06/24/hardware-memory-models-for-programmers/">originally posted 2013</a></p>
+<p>Nearly all computer systems now a days have hardware which have multi core chips and shared memory. in this post I hope to summarize things i learnt from a <a href="https://www.cl.cam.ac.uk/~pes20/weakmemory/cacm.pdf">x86-TSO paper</a>, and hope to provide a high level overview of TSO (total store order) model which is most common on x86 processors. What i really like about this paper is it provices a simple abstract model software developers can use to reason about low-level concurrency code running on x86 modern multi-core shared memory systems.</p>
+<p>Most programmer are aware of modern multi-core systems have hierarcial memory subsystem and level of cpu caches and numerous performance optimizations that have observable consequence for multi-threaded concurrent programs.
+From a correctness point of  view most of the internal components are invisible or cannot be observed by single threaded software , one of the components to keep a note of is the store buffers of each core.
+Even with the hierarchy of fast caches to main memory , the core often stall while accessing memory, to further hide this latency each core has it own private load and store buffer which basically a FIFO queue which buffer pending writes and reads from memory. We will see later that store buffer does have observable consequences for multi-threaded programs.</p>
+<h2 id="why-memory-model">why memory model</h2>
+<p>Memory model allow programmers to reason about the correctness of their programs, it also help programmer get most out the performance optimizations modern multi-core systems  can make. The x86 processor have most strongest guarentees and most intutive but even with this there are some non-intuitve results which are legal. Lets now explore the allowed globally visible states from program below running on a x86 intel processor (i tried this out on an intel core i3)</p>
+<p>// x and y are initialised to 0</p>
+<table>
+<thead>
+<tr>
+<th>CORE-0</th>
+<th>CORE-1</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>x = 1</td>
+<td>y = 1</td>
+</tr>
+<tr>
+<td>r0 = y</td>
+<td>r1 = x</td>
+</tr>
+</tbody>
+</table>
+<p>In code it would look something like this</p>
+<pre tabindex="0"><code>int x, y = 0;
+int r0, r1;
+ 
+void thread0 ()
+{
+  x = 1;
+  r0 = y;
+  
+}
+
+void thread1 ()
+{
+  y = 1;
+  r1 = x;
+  
+}
+</code></pre><p>The interesting thing in the example above is there is <strong>only one writer</strong> to any given memory location at any time. On a multi-core processor what could the end results of x and y be?  Intuitively we can consider all possible in program-order executions,   see that any of the values below could be expected.</p>
+<ol>
+<li>Thread0 runs first all way through r0=0, r1=1</li>
+<li>Thread1 runs first all way through r0=1, r1=0</li>
+<li>any other interleaving opertion can only result in r0=1 , r1=1
+Interleaving possiblites</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>STEP-1</th>
+<th>STEP-2</th>
+<th>STEP-3</th>
+<th>STEP-4</th>
+<th>(R0, R1)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>core-1: y=1</td>
+<td>core-0: x=1</td>
+<td>core-1: r1=x</td>
+<td>core-0: r0=y</td>
+<td>(1,1)</td>
+</tr>
+<tr>
+<td>core-1: y=1</td>
+<td>core-0: x=1</td>
+<td>core-0: r1=y</td>
+<td>core-1: r0=x</td>
+<td>(1,1)</td>
+</tr>
+<tr>
+<td>core-0: x=1</td>
+<td>core-1: y=1</td>
+<td>core-0: r0=y</td>
+<td>core-1: r1=x</td>
+<td>(1,1)</td>
+</tr>
+<tr>
+<td>core-0: x=1</td>
+<td>core-1: y=1</td>
+<td>core-1: r1=x</td>
+<td>core-0: r0=y</td>
+<td>(1,1)</td>
+</tr>
+</tbody>
+</table>
+<p>The sequential semantics that is intuitive for most us is called sequential consistency model.</p>
+<p>As we can see it the table above , assuming each processor executed in-program order , There is no interleaving execution that could produce a state where (r0,r1) = (0,0). If the state were to occur (r0,r1) = (0,0) , it would appear from a software point of view as if either thread-0 or thread-1 effectively executed their instructions out of sequence.</p>
+<ol>
+<li>compiler reorders the write and read operation</li>
+</ol>
+<p>we can stop compiler from doing any reordering , we can verify this by examing the assembly ouput from gcc compiler</p>
+<p><a href="https://gist.github.com/isaiah-perumalla/5809246">gist</a></p>
+<div class="highlight"><div style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;display:grid;">
+<table style="border-spacing:0;padding:0;margin:0;border:0;"><tr><td style="vertical-align:top;padding:0;margin:0;border:0;">
+<pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;display:grid;"><code><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 5
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 6
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 9
+</span><span style="background-color:#3c3d38"><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">10
+</span></span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">11
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">12
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">13
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">14
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">15
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">16
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">17
+</span><span style="background-color:#3c3d38"><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">18
+</span></span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">19
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">20
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">21
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">22
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">23
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">24
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">25
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">26
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">27
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">28
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">29
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">30
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">31
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">32
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">33
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">34
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">35
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">36
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">37
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">38
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">39
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">40
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">41
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">42
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">43
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">44
+</span></code></pre></td>
+<td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
+<pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;display:grid;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;pthread.h&gt;</span><span style="color:#75715e">
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;stdio.h&gt;</span><span style="color:#75715e">
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span> 
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">int</span> x, y <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">int</span> r0, r1;
+</span></span><span style="display:flex;"><span> 
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">void</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">core0</span> (<span style="color:#66d9ef">void</span> <span style="color:#f92672">*</span>arg)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  x <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex; background-color:#3c3d38"><span>  <span style="color:#66d9ef">asm</span> <span style="color:#66d9ef">volatile</span> (<span style="color:#e6db74">&#34;&#34;</span> <span style="color:#f92672">:::</span> <span style="color:#e6db74">&#34;memory&#34;</span>); <span style="color:#75715e">// ensure GCC compiler will not reorder 
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  r1 <span style="color:#f92672">=</span> y;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span> 
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">void</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">core1</span> (<span style="color:#66d9ef">void</span> <span style="color:#f92672">*</span>arg)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  y <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex; background-color:#3c3d38"><span>  <span style="color:#66d9ef">asm</span> <span style="color:#66d9ef">volatile</span> (<span style="color:#e6db74">&#34;&#34;</span> <span style="color:#f92672">:::</span> <span style="color:#e6db74">&#34;memory&#34;</span>); <span style="color:#75715e">// ensure GCC compiler will not reorder 
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  r0 <span style="color:#f92672">=</span> x;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span> 
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">int</span> <span style="color:#a6e22e">main</span> (<span style="color:#66d9ef">void</span>)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  pthread_t thread0, thread1;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">while</span> (<span style="color:#ae81ff">1</span>) {
+</span></span><span style="display:flex;"><span>    x <span style="color:#f92672">=</span> y <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">//Start threads
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    pthread_create (<span style="color:#f92672">&amp;</span>thread0, NULL, core0, NULL);
+</span></span><span style="display:flex;"><span>    pthread_create (<span style="color:#f92672">&amp;</span>thread1, NULL, core1, NULL);
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">//wait for threads to complete
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    pthread_join (thread0, NULL);
+</span></span><span style="display:flex;"><span>    pthread_join (thread1, NULL);
+</span></span><span style="display:flex;"><span> 
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (r0 <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span> <span style="color:#f92672">&amp;&amp;</span> r1 <span style="color:#f92672">==</span><span style="color:#ae81ff">0</span>) {
+</span></span><span style="display:flex;"><span>      printf (<span style="color:#e6db74">&#34;(r0=%d, r1=%d)</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>, r0, r1);
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">break</span>;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Since we are focusing on the behavior of the hardware, we want to ensure the gcc compiler does not reorder any of the instruction,</p>
+<p><code>asm volatile (&quot;&quot; ::: &quot;memory&quot;);</code></p>
+<p>directive on lines 10 and 18 ensure compiler optimization will not reorder the statements.</p>
+<p>Compiling the above code with gcc with 02 optimizations</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-shell" data-lang="shell"><span style="display:flex;"><span>gcc -02 x86mem.c -o x86mem -pthread
+</span></span></code></pre></div><p>looking at the assembly output of the code its clear write followed by read instructions are <em>not reorder</em></p>
+<p><a href="https://gcc.godbolt.org/z/W1bh3rE3a">https://gcc.godbolt.org/z/W1bh3rE3a</a></p>
+<div class="highlight"><div style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;display:grid;">
+<table style="border-spacing:0;padding:0;margin:0;border:0;"><tr><td style="vertical-align:top;padding:0;margin:0;border:0;">
+<pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;display:grid;"><code><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 4
+</span><span style="background-color:#3c3d38"><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 5
+</span></span><span style="background-color:#3c3d38"><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 6
+</span></span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">10
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">11
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">12
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">13
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">14
+</span><span style="background-color:#3c3d38"><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">15
+</span></span><span style="background-color:#3c3d38"><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">16
+</span></span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">17
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">18
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">19
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">20
+</span></code></pre></td>
+<td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
+<pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;display:grid;"><code class="language-asm" data-lang="asm"><span style="display:flex;"><span>core0:
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">push</span>    <span style="color:#66d9ef">rbp</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">mov</span>     <span style="color:#66d9ef">rbp</span>, <span style="color:#66d9ef">rsp</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">mov</span>     <span style="color:#66d9ef">QWORD</span> <span style="color:#66d9ef">PTR</span> [<span style="color:#66d9ef">rbp-8</span>], <span style="color:#66d9ef">rdi</span>
+</span></span><span style="display:flex; background-color:#3c3d38"><span>        <span style="color:#a6e22e">mov</span>     <span style="color:#66d9ef">DWORD</span> <span style="color:#66d9ef">PTR</span> <span style="color:#66d9ef">x</span>[<span style="color:#66d9ef">rip</span>], <span style="color:#ae81ff">1</span>   <span style="color:#75715e">## write value 1 to x
+</span></span></span><span style="display:flex; background-color:#3c3d38"><span><span style="color:#75715e"></span>        <span style="color:#66d9ef">mov</span>     <span style="color:#66d9ef">eax</span>, <span style="color:#66d9ef">DWORD</span> <span style="color:#66d9ef">PTR</span> <span style="color:#66d9ef">y</span>[<span style="color:#66d9ef">rip</span>] <span style="color:#75715e">## read contents of y into  register
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#66d9ef">mov</span>     <span style="color:#66d9ef">DWORD</span> <span style="color:#66d9ef">PTR</span> <span style="color:#66d9ef">r1</span>[<span style="color:#66d9ef">rip</span>], <span style="color:#66d9ef">eax</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">mov</span>     <span style="color:#66d9ef">eax</span>, <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">pop</span>     <span style="color:#66d9ef">rbp</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">ret</span>
+</span></span><span style="display:flex;"><span>core1:
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">push</span>    <span style="color:#66d9ef">rbp</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">mov</span>     <span style="color:#66d9ef">rbp</span>, <span style="color:#66d9ef">rsp</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">mov</span>     <span style="color:#66d9ef">QWORD</span> <span style="color:#66d9ef">PTR</span> [<span style="color:#66d9ef">rbp-8</span>], <span style="color:#66d9ef">rdi</span>
+</span></span><span style="display:flex; background-color:#3c3d38"><span>        <span style="color:#a6e22e">mov</span>     <span style="color:#66d9ef">DWORD</span> <span style="color:#66d9ef">PTR</span> <span style="color:#66d9ef">y</span>[<span style="color:#66d9ef">rip</span>], <span style="color:#ae81ff">1</span> <span style="color:#75715e">## write value 1 to y
+</span></span></span><span style="display:flex; background-color:#3c3d38"><span><span style="color:#75715e"></span>        <span style="color:#66d9ef">mov</span>     <span style="color:#66d9ef">eax</span>, <span style="color:#66d9ef">DWORD</span> <span style="color:#66d9ef">PTR</span> <span style="color:#66d9ef">x</span>[<span style="color:#66d9ef">rip</span>] <span style="color:#75715e">## read contents of x into  register
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>        <span style="color:#66d9ef">mov</span>     <span style="color:#66d9ef">DWORD</span> <span style="color:#66d9ef">PTR</span> <span style="color:#66d9ef">r0</span>[<span style="color:#66d9ef">rip</span>], <span style="color:#66d9ef">eax</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">mov</span>     <span style="color:#66d9ef">eax</span>, <span style="color:#ae81ff">0</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">pop</span>     <span style="color:#66d9ef">rbp</span>
+</span></span><span style="display:flex;"><span>        <span style="color:#a6e22e">ret</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h2 id="dont-forget-the-store-buffer-">Dont forget the Store buffer !</h2>
+<p>What we seeing about are visible effects of store buffer. Store buffer is just a private FIFO queue to schedule write to memory subystem, this is not a side effect of cpu cache coherency but it is the effects of private store buffers of each core.
+as we demonstrated in the example the write to memory by each core are queued its private store buffer, while each core can read its most recent buffered write ,  the writes in the buffer are invisible to other cores. So before each core’s buffered writes have propagated to the memory subsystem, each core could already executed the next read instruction,  this effectively has the same effect as a memory read instruction getting ahead of an older memory write instruction, according to the x86 TSO memory model this is valid execution. So it clear from this example a programmer model of the hardware must account for the store buffer. To understand and reason about the x86 memory model the following simpler hardware model is sufficient for a programmer.</p>
+<p><img src="/imgs/memory/memorymodel.png" alt="programmers view"></p>
+<p>In the abstract model above the programmer can simply view each core (hardware thread in this context) as having it own private store FIFO buffers, all writes get queued into the store buffer and each core can ‘snoop its own buffer’ , that is read its most recent buffered write directly from its buffer (other cores will not see the buffered writes until it is propagated to memory). This is why running the program above on a single cpu core will never result in state <code>r0=0, r1=0</code></p>
+<p>As the example demonstrated the x86 memory model in a mulit-core execution the store buffers are made visible to the programmer, the consequence of this is the x86 model, has slightly weaker memory model than sequential consistency called the Total store order. In a TSO model following operations must be visible to all cores as if they were executed sequentially</p>
+<ul>
+<li>Load  are not reordered with other loads</li>
+<li>Store  are not reordered with other stores as every write is queued in a FIFO buffer</li>
+<li>Loads can be reordered with earlier stores to different memory location. Load and stores to same memory location will not be reordered</li>
+<li>Memory ordering obeys causality (ie stores are seen in consistent order by other processors)</li>
+</ul>
+<h2 id="what-can-programmers-do--">What can programmers do  ?</h2>
+<p>Since a Store followed by a Load can appear out of order to other cores, however programmers may wish to ensure load and store instructions to be ordered across all cores , the x86 processor have a ‘mfence’ (memory fence) instruction. the mfence instruction will ensure a core will not only reorder the instructions, but also will ensure that any <em>buffered stores in the cores private store buffer are propagated to the memory subsystem</em> before executing instructions after mfence. with this instruction we can strengthen the memory consistency model when required by the software. By adding the mfence instruction to our previous example , it should never be possible to get a state where (r1,r2) = (0,0)</p>
+<div class="highlight"><div style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;display:grid;">
+<table style="border-spacing:0;padding:0;margin:0;border:0;"><tr><td style="vertical-align:top;padding:0;margin:0;border:0;">
+<pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;display:grid;"><code><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 5
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 6
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">10
+</span><span style="background-color:#3c3d38"><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">11
+</span></span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">12
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">13
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">14
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">15
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">16
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">17
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">18
+</span><span style="background-color:#3c3d38"><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">19
+</span></span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">20
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">21
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">22
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">23
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">24
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">25
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">26
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">27
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">28
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">29
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">30
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">31
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">32
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">33
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">34
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">35
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">36
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">37
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">38
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">39
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">40
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">41
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">42
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">43
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">44
+</span><span style="white-space:pre;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">45
+</span></code></pre></td>
+<td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
+<pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;display:grid;"><code class="language-C" data-lang="C"><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;pthread.h&gt;</span><span style="color:#75715e">
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e">#include</span> <span style="color:#75715e">&lt;stdio.h&gt;</span><span style="color:#75715e">
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span> 
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">int</span> x, y <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">int</span> r0, r1;
+</span></span><span style="display:flex;"><span> 
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">void</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">core0</span> (<span style="color:#66d9ef">void</span> <span style="color:#f92672">*</span>arg)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  x <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex; background-color:#3c3d38"><span>  <span style="color:#66d9ef">asm</span> <span style="color:#66d9ef">volatile</span> (<span style="color:#e6db74">&#34;mfence&#34;</span> <span style="color:#f92672">:::</span> <span style="color:#e6db74">&#34;memory&#34;</span>); <span style="color:#75715e">// ensure compiler or hardware will not reorder, store buffer is drained
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  r1 <span style="color:#f92672">=</span> y;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span> 
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">void</span> <span style="color:#f92672">*</span><span style="color:#a6e22e">core1</span> (<span style="color:#66d9ef">void</span> <span style="color:#f92672">*</span>arg)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  y <span style="color:#f92672">=</span> <span style="color:#ae81ff">1</span>;
+</span></span><span style="display:flex; background-color:#3c3d38"><span>  <span style="color:#66d9ef">asm</span> <span style="color:#66d9ef">volatile</span> (<span style="color:#e6db74">&#34;mfence&#34;</span> <span style="color:#f92672">:::</span> <span style="color:#e6db74">&#34;memory&#34;</span>); <span style="color:#75715e">// ensure compiler or hardware will not reorder, store buffer is drained
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>  r0 <span style="color:#f92672">=</span> x;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span> 
+</span></span><span style="display:flex;"><span> 
+</span></span><span style="display:flex;"><span><span style="color:#66d9ef">int</span> <span style="color:#a6e22e">main</span> (<span style="color:#66d9ef">void</span>)
+</span></span><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  pthread_t thread0, thread1;
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">while</span> (<span style="color:#ae81ff">1</span>) {
+</span></span><span style="display:flex;"><span>    x <span style="color:#f92672">=</span> y <span style="color:#f92672">=</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">//Start threads
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    pthread_create (<span style="color:#f92672">&amp;</span>thread0, NULL, core0, NULL);
+</span></span><span style="display:flex;"><span>    pthread_create (<span style="color:#f92672">&amp;</span>thread1, NULL, core1, NULL);
+</span></span><span style="display:flex;"><span> 
+</span></span><span style="display:flex;"><span>    <span style="color:#75715e">//wait for threads to complete
+</span></span></span><span style="display:flex;"><span><span style="color:#75715e"></span>    pthread_join (thread0, NULL);
+</span></span><span style="display:flex;"><span>    pthread_join (thread1, NULL);
+</span></span><span style="display:flex;"><span> 
+</span></span><span style="display:flex;"><span>    <span style="color:#66d9ef">if</span> (r0 <span style="color:#f92672">==</span> <span style="color:#ae81ff">0</span> <span style="color:#f92672">&amp;&amp;</span> r1 <span style="color:#f92672">==</span><span style="color:#ae81ff">0</span>) {
+</span></span><span style="display:flex;"><span>      printf (<span style="color:#e6db74">&#34;(r0=%d, r1=%d)</span><span style="color:#ae81ff">\n</span><span style="color:#e6db74">&#34;</span>, r0, r1);
+</span></span><span style="display:flex;"><span>      <span style="color:#66d9ef">break</span>;
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span> 
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>  <span style="color:#66d9ef">return</span> <span style="color:#ae81ff">0</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>The above program should not terminate, as there can never be a case where (r1,r2) = (0,0).</p>
+<p>x86 processor also have a number of atomic instructions, such as XCHG which swaps the data between two memory locations atomically at the hardware . All atomic operations implicitly also drain the store buffer and prevents core from reordering instructions. In the next post we will go through practical examples of using memory models to reason about correctness and improve performance.</p>
+
+    </div>
+  </article>
+
+  
+  
+
+
+
+
+
+  <div id="footer-post-container">
+  <div id="footer-post">
+
+    <div id="nav-footer" style="display: none">
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/posts">All posts</a></li>
+         
+          <li><a href="/tags">Tags</a></li>
+        
+      </ul>
+    </div>
+
+    <div id="toc-footer" style="display: none">
+      <nav id="TableOfContents">
+  <ul>
+    <li><a href="#why-memory-model">why memory model</a></li>
+    <li><a href="#dont-forget-the-store-buffer-">Dont forget the Store buffer !</a></li>
+    <li><a href="#what-can-programmers-do--">What can programmers do  ?</a></li>
+  </ul>
+</nav>
+    </div>
+
+    <div id="share-footer" style="display: none">
+      
+      <ul>
+  
+  
+    
+  
+  
+  <li>
+    <a class="icon" href="http://www.facebook.com/sharer.php?u=https%3a%2f%2f0x-rust.github.io%2fposts%2fmemory-model%2f">
+      <i class="fab fa-facebook fa-lg" aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="https://twitter.com/share?url=https%3a%2f%2f0x-rust.github.io%2fposts%2fmemory-model%2f&text=hardware%20memory%20models%20for%20programmers">
+      <i class="fab fa-twitter fa-lg" aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="http://www.linkedin.com/shareArticle?url=https%3a%2f%2f0x-rust.github.io%2fposts%2fmemory-model%2f&title=hardware%20memory%20models%20for%20programmers">
+      <i class="fab fa-linkedin fa-lg" aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="https://pinterest.com/pin/create/bookmarklet/?url=https%3a%2f%2f0x-rust.github.io%2fposts%2fmemory-model%2f&is_video=false&description=hardware%20memory%20models%20for%20programmers">
+      <i class="fab fa-pinterest fa-lg" aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="mailto:?subject=hardware%20memory%20models%20for%20programmers&body=Check out this article: https%3a%2f%2f0x-rust.github.io%2fposts%2fmemory-model%2f">
+      <i class="fas fa-envelope fa-lg" aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="https://getpocket.com/save?url=https%3a%2f%2f0x-rust.github.io%2fposts%2fmemory-model%2f&title=hardware%20memory%20models%20for%20programmers">
+      <i class="fab fa-get-pocket fa-lg" aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="http://reddit.com/submit?url=https%3a%2f%2f0x-rust.github.io%2fposts%2fmemory-model%2f&title=hardware%20memory%20models%20for%20programmers">
+      <i class="fab fa-reddit fa-lg" aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="http://www.stumbleupon.com/submit?url=https%3a%2f%2f0x-rust.github.io%2fposts%2fmemory-model%2f&title=hardware%20memory%20models%20for%20programmers">
+      <i class="fab fa-stumbleupon fa-lg" aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="http://digg.com/submit?url=https%3a%2f%2f0x-rust.github.io%2fposts%2fmemory-model%2f&title=hardware%20memory%20models%20for%20programmers">
+      <i class="fab fa-digg fa-lg" aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="http://www.tumblr.com/share/link?url=https%3a%2f%2f0x-rust.github.io%2fposts%2fmemory-model%2f&name=hardware%20memory%20models%20for%20programmers&description=originally%20posted%202013%0aNearly%20all%20computer%20systems%20now%20a%20days%20have%20hardware%20which%20have%20multi%20core%20chips%20and%20shared%20memory.%20in%20this%20post%20I%20hope%20to%20summarize%20things%20i%20learnt%20from%20a%20x86-TSO%20paper%2c%20and%20hope%20to%20provide%20a%20high%20level%20overview%20of%20TSO%20%28total%20store%20order%29%20model%20which%20is%20most%20common%20on%20x86%20processors.%20What%20i%20really%20like%20about%20this%20paper%20is%20it%20provices%20a%20simple%20abstract%20model%20software%20developers%20can%20use%20to%20reason%20about%20low-level%20concurrency%20code%20running%20on%20x86%20modern%20multi-core%20shared%20memory%20systems.">
+      <i class="fab fa-tumblr fa-lg" aria-hidden="true"></i>
+    </a>
+  </li>
+  <li>
+    <a class="icon" href="https://news.ycombinator.com/submitlink?u=https%3a%2f%2f0x-rust.github.io%2fposts%2fmemory-model%2f&t=hardware%20memory%20models%20for%20programmers">
+      <i class="fab fa-hacker-news fa-lg" aria-hidden="true"></i>
+    </a>
+  </li>
+</ul>
+
+    </div>
+
+    <div id="actions-footer">
+      
+        <a id="menu" class="icon" href="#" onclick="$('#nav-footer').toggle();return false;">
+          <i class="fas fa-bars fa-lg" aria-hidden="true"></i> Menu</a>
+        <a id="toc" class="icon" href="#" onclick="$('#toc-footer').toggle();return false;">
+          <i class="fas fa-list fa-lg" aria-hidden="true"></i> TOC</a>
+        <a id="share" class="icon" href="#" onclick="$('#share-footer').toggle();return false;">
+          <i class="fas fa-share-alt fa-lg" aria-hidden="true"></i> share</a>
+        <a id="top" style="display:none" class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');">
+          <i class="fas fa-chevron-up fa-lg" aria-hidden="true"></i> Top</a>
+    </div>
+
+  </div>
+</div>
+
+
+  <footer id="footer">
+  <div class="footer-left">
+    Copyright  &copy; 2022  small bytes of Rust 
+  </div>
+  <div class="footer-right">
+    <nav>
+      <ul>
+         
+        <li><a href="/">Home</a></li>
+         
+        <li><a href="/posts">All posts</a></li>
+         
+        <li><a href="/tags">Tags</a></li>
+        
+      </ul>
+    </nav>
+  </div>
+</footer>
+
+
+  </div>
+</body>
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+<script src="/lib/jquery/jquery.min.js"></script>
+<script src="/js/main.js"></script>
+
+
+
+</html>

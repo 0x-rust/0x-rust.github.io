@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>small bytes of Rust</title>
+    <link>https://0x-rust.github.io/</link>
+    <description>Recent content on small bytes of Rust</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sun, 20 Mar 2022 20:43:25 +0000</lastBuildDate><atom:link href="https://0x-rust.github.io/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>hardware memory models for programmers</title>
+      <link>https://0x-rust.github.io/posts/memory-model/</link>
+      <pubDate>Sun, 20 Mar 2022 20:43:25 +0000</pubDate>
+      
+      <guid>https://0x-rust.github.io/posts/memory-model/</guid>
+      <description>originally posted 2013
+Nearly all computer systems now a days have hardware which have multi core chips and shared memory. in this post I hope to summarize things i learnt from a x86-TSO paper, and hope to provide a high level overview of TSO (total store order) model which is most common on x86 processors. What i really like about this paper is it provices a simple abstract model software developers can use to reason about low-level concurrency code running on x86 modern multi-core shared memory systems.</description>
+    </item>
+    
+    <item>
+      <title>About</title>
+      <link>https://0x-rust.github.io/about/</link>
+      <pubDate>Sun, 19 Aug 2012 14:34:13 +0100</pubDate>
+      
+      <guid>https://0x-rust.github.io/about/</guid>
+      <description>I am an independent software engineer based in London, UK. I mostly work on financial trading systems, previously I worked a ThoughtWorks. I was a grad at University of York and I was an undergrad at the University of Sydney. I have skills in a broad range of programming languages and paradigms (which includes Java, Python, C# and F#) prefer to use the best tool for the job
+Contact Isaiah  PGP Key Contact details  </description>
+    </item>
+    
+  </channel>
+</rss>
