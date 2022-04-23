@@ -1,12 +1,12 @@
 ---
 title: "Relearning Depth First search (DFS)"
 date: 2022-04-21T19:07:58Z
-draft: true
+draft: false
 ---
 
 ## DFS
-Depth first is fundamental graph traversal method, it simple enough to understand [Depth first search](https://en.wikipedia.org/wiki/Depth-first_search), I used simply viewed
-this as graph traversal method and nothing more. As I revisted thing recently I realised, it a much more powerful tool
+Depth first is fundamental graph traversal method, it simple enough to understand [Depth first search](https://en.wikipedia.org/wiki/Depth-first_search), until recently I simply viewed this as graph traversal method and nothing more. As I revisted thing recently I realised, it a much more powerful tool .
+In this post I hope to summarize things I learnt from a [DFS Tarjan 1972](/docs/dfs-tarjan.pdf)
 
 
 ## DFS Tree
