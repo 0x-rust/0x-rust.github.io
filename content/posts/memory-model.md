@@ -6,15 +6,26 @@ draft: false
 
 [originally posted 2013](https://isaiahperumalla.wordpress.com/2013/06/24/hardware-memory-models-for-programmers/) 
 
-Nearly all computer systems now a days have hardware which have multi core chips and shared memory. in this post I hope to summarize things i learnt from a [x86-TSO paper](https://www.cl.cam.ac.uk/~pes20/weakmemory/cacm.pdf), and hope to provide a high level overview of TSO (total store order) model which is most common on x86 processors. What i really like about this paper is it provices a simple abstract model software developers can use to reason about low-level concurrency code running on x86 modern multi-core shared memory systems.
+In this post I hope to summarize things i learnt from a [x86-TSO paper](https://www.cl.cam.ac.uk/~pes20/weakmemory/cacm.pdf), and hope to provide a high level overview of TSO (total store order) model which is most common on x86 processors. What i really like about this paper is it provices a simple abstract model software developers can use to reason about low-level concurrency code running on x86 modern multi-core shared memory systems.
+I found this paritcularily useful in understanding correctness of lock-free concurrent data structures
 
 Most programmer are aware of modern multi-core systems have hierarcial memory subsystem and level of cpu caches and numerous performance optimizations that have observable consequence for multi-threaded concurrent programs. 
-From a correctness point of  view most of the internal components are invisible or cannot be observed by single threaded software , one of the components to keep a note of is the store buffers of each core. 
-Even with the hierarchy of fast caches to main memory , the core often stall while accessing memory, to further hide this latency each core has it own private load and store buffer which basically a FIFO queue which buffer pending writes and reads from memory. We will see later that store buffer does have observable consequences for multi-threaded programs.
+From a correctness point of  view most of the internal components of hardware are invisible or cannot be observed by single threaded software.
+But this is not the case with multi-threaded programs, as hardware and compiler optimizations can affect the visibility and consistency of changes to data stored in memory. 
+on x86-TSO based hardware one of the lesser known components, that has an observable effect on software is the store buffers of each core, even with the hierarchy of fast caches to main memory , the core often stall while writing to a cache-line on cpu cache, to further hide this latency each core has it own *private store buffer* which basically a FIFO queue which buffer pending writes and reads from memory. We will see later that store buffer does have observable consequences for multi-threaded programs.
 
-## why memory model
+for x86 the abstract model with explict store buffer below is, give us better intution to reason about programs running on x86 TSO processors 
+![programmers view](/imgs/memory/memorymodel.png)
 
-Memory model allow programmers to reason about the correctness of their programs, it also help programmer get most out the performance optimizations modern multi-core systems  can make. The x86 processor have most strongest guarentees and most intutive but even with this there are some non-intuitve results which are legal. Lets now explore the allowed globally visible states from program below running on a x86 intel processor (i tried this out on an intel core i3)
+1. Each processor has a private store buffer, cpu writes are buffer here, while it continues executing new instructions while the writes make their way out to memory subsystem.
+2. order of writes are preserved by the store buffer, what this means is writes are never re-ordered
+3. on a memory read a cpu consult its private store buffer, before reaching out to memory subsytem (memeory subsystem include its cache)
+4. The net effect is each cpu sees it own write operation before any other cpu
+
+
+## Observing effects of store buffer
+
+The x86 processor have one strongest guarentees and most intutive but even with this there are some non-intuitve results which are legal. Lets now explore the allowed globally visible states from program below running on a x86 intel processor (i tried this out on an intel core i3)
 
 // x and y are initialised to 0
 
@@ -45,24 +56,9 @@ void thread1 ()
 ```
 
 The interesting thing in the example above is there is **only one writer** to any given memory location at any time. On a multi-core processor what could the end results of x and y be?  Intuitively we can consider all possible in program-order executions,   see that any of the values below could be expected.
+assuming each processor executed in-program order intuively we would expect either x = 1 or y = 1 to happen first, before any read operation.
+There is no interleaving execution that could produce a state where (r0,r1) = (0,0). If the state were to occur (r0,r1) = (0,0) , it would appear from a software point of view as if either thread-0 or thread-1 effectively executed their instructions out of sequence, even with forbidding compiler optimization which could re-orders write and reads, we can see observe that the state r0=0, r1=0 is possible.
 
-1. Thread0 runs first all way through r0=0, r1=1 
-2. Thread1 runs first all way through r0=1, r1=0
-3. any other interleaving opertion can only result in r0=1 , r1=1 
-Interleaving possiblites 
-
-|STEP-1	        | STEP-2        | STEP-3        |	STEP-4	 | (R0, R1)|
-|---------------|---------------|---------------|------------|---------|
-|core-1: y=1	  |core-0: x=1	|core-1: r1=x	|core-0: r0=y|	(1,1)  |
-|core-1: y=1	  |core-0: x=1	|core-0: r1=y	|core-1: r0=x|	(1,1)  |
-|core-0: x=1	  |core-1: y=1	|core-0: r0=y	|core-1: r1=x|	(1,1)  |
-|core-0: x=1	  |core-1: y=1	|core-1: r1=x	|core-0: r0=y|	(1,1)  |
-
-
-The sequential semantics that is intuitive for most us is called sequential consistency model.
-
-As we can see it the table above , assuming each processor executed in-program order , There is no interleaving execution that could produce a state where (r0,r1) = (0,0). If the state were to occur (r0,r1) = (0,0) , it would appear from a software point of view as if either thread-0 or thread-1 effectively executed their instructions out of sequence. 
-1. compiler reorders the write and read operation 
 
 we can stop compiler from doing any reordering , we can verify this by examing the assembly ouput from gcc compiler
 
@@ -157,11 +153,12 @@ core1:
 ```
 ## Dont forget the Store buffer !
 
-What we seeing about are visible effects of store buffer. Store buffer is just a private FIFO queue to schedule write to memory subystem, this is not a side effect of cpu cache coherency but it is the effects of private store buffers of each core. 
+What we seeing about are visible effects of store buffer. Store buffer is just a private FIFO queue to schedule write to memory subystem, this is not a side effect of cpu cache coherency but it is the effects of private store buffers of each core.
+
 as we demonstrated in the example the write to memory by each core are queued its private store buffer, while each core can read its most recent buffered write ,  the writes in the buffer are invisible to other cores. So before each core’s buffered writes have propagated to the memory subsystem, each core could already executed the next read instruction,  this effectively has the same effect as a memory read instruction getting ahead of an older memory write instruction, according to the x86 TSO memory model this is valid execution. So it clear from this example a programmer model of the hardware must account for the store buffer. To understand and reason about the x86 memory model the following simpler hardware model is sufficient for a programmer.
 
  
-![programmers view](/imgs/memory/memorymodel.png)
+
 
 In the abstract model above the programmer can simply view each core (hardware thread in this context) as having it own private store FIFO buffers, all writes get queued into the store buffer and each core can ‘snoop its own buffer’ , that is read its most recent buffered write directly from its buffer (other cores will not see the buffered writes until it is propagated to memory). This is why running the program above on a single cpu core will never result in state `r0=0, r1=0`
 
@@ -172,7 +169,7 @@ In the abstract model above the programmer can simply view each core (hardware t
 * Loads can be reordered with earlier stores to different memory location. Load and stores to same memory location will not be reordered
 * Memory ordering obeys causality (ie stores are seen in consistent order by other processors)
 
-## What can programmers do  ?
+## Draining the store buffer  
 
 Since a Store followed by a Load can appear out of order to other cores, however programmers may wish to ensure load and store instructions to be ordered across all cores , the x86 processor have a ‘mfence’ (memory fence) instruction. the mfence instruction will ensure a core will not only reorder the instructions, but also will ensure that any *buffered stores in the cores private store buffer are propagated to the memory subsystem* before executing instructions after mfence. with this instruction we can strengthen the memory consistency model when required by the software. By adding the mfence instruction to our previous example , it should never be possible to get a state where (r1,r2) = (0,0)
 
